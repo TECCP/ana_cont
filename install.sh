@@ -29,5 +29,5 @@ fi
 export PYTHONPATH=$PYTHONPATH:$BASE_DIR
 
 
-echo "export PYTHONPATH=\$PYTHONPATH:$BASE_DIR" > .profile
-source .profile
+#echo "export PYTHONPATH=\$PYTHONPATH:$BASE_DIR" > .profile
+#source .profile

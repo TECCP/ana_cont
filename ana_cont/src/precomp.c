@@ -257,17 +257,45 @@ static PyMethodDef module_methods[] = {
 
 
 /*      Initialization of the module.   */
+/*
+
 PyMODINIT_FUNC initprecomp(void)
 {
     PyObject* obj;
 
     obj = Py_InitModule3("precomp", module_methods, "Precomputation of coefficient matrices for my Maxent.");
 
-        /*      Very important call, otherwise something crashes.       */
+        #Very important call, otherwise something crashes. 
         import_array();
 
     if (obj == NULL)
       return;
 }
+
+*/
+
 /*      End of Python-specific stuff.
 ------------------------------------------------------------------------------*/
+
+
+/* deprecated : 
+PyMODINIT_FUNC init_uniqueCombinations(void)
+{
+    Py_InitModule3("uniqueCombinations", uniqueCombinations_funcs,
+                   "Extension module uniqueCombinations v. 0.01");
+}
+*/
+
+static struct PyModuleDef precomp =
+{
+    PyModuleDef_HEAD_INIT,
+    "precomp", /* name of module */
+    "Precomputation of coefficient matrices for my Maxent.\n", /* module documentation, may be NULL */
+    -1,   /* size of per-interpreter state of the module, or -1 if the module keeps state in global variables. */
+    module_methods
+};
+
+PyMODINIT_FUNC PyInit_precomp(void)
+{
+    return PyModule_Create(&precomp);
+}
