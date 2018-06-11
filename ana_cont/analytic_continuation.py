@@ -1,70 +1,74 @@
 import sys
 import numpy as np
 from src import precomp
+import spam
 #from src import pade
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
 import os
 
-
-
 class AnalyticContinuationProblem(object):
-    def __init__(self,im_axis=None,re_axis=None,im_data=None,kernel_mode=None,beta=1.):
-        self.kernel_mode=kernel_mode
-        self.im_axis=im_axis
-        self.re_axis=re_axis
-        self.im_data=im_data
-        if self.kernel_mode=='freq_bosonic':
+    def __init__(self, im_axis=None, re_axis=None, im_data=None, kernel_mode=None, beta=1.):
+        self.kernel_mode = kernel_mode
+        self.im_axis = im_axis
+        self.re_axis = re_axis
+        self.im_data = im_data
+        if self.kernel_mode == 'freq_bosonic':
             pass # not necessary to do anything additionally here
-        elif self.kernel_mode=='time_bosonic':
-            self.im_axis=im_axis/beta
-            self.re_axis=re_axis*beta
-            self.im_data=im_data*beta
-            self.beta=beta
-        elif self.kernel_mode=='freq_fermionic':
-            self.im_data=np.concatenate((im_data.real,im_data.imag))
-        elif self.kernel_mode=='freq_fermionic_phsym':
+        elif self.kernel_mode == 'time_bosonic':
+            self.im_axis = im_axis/beta
+            self.re_axis = re_axis*beta
+            self.im_data = im_data*beta
+            self.beta = beta
+        elif self.kernel_mode == 'freq_fermionic':
+            self.im_data = np.concatenate((im_data.real,im_data.imag))
+        elif self.kernel_mode == 'freq_fermionic_phsym':
             # check if data are purely imaginary
             if np.allclose(im_axis.real,0.):
-                self.im_data=im_data.imag
+                self.im_data = im_data.imag
             elif np.allclose(im_axis.imag,0.): # if only the imaginary part is passed
-                self.im_data=im_data.real
+                self.im_data = im_data.real
             else:
                 print ('The data are neither purely real nor purely imaginary,')
                 print ('you cannot use a ph-symmetric kernel in this case.')
                 sys.exit()
-        elif self.kernel_mode=='time_fermionic' or self.kernel_mode=='time_fermionic_phsym':
-            self.im_axis=im_axis/beta
-            self.re_axis=re_axis*beta
-            self.im_data=im_data
-            self.beta=beta
+        elif self.kernel_mode == 'time_fermionic' or self.kernel_mode == 'time_fermionic_phsym':
+            self.im_axis = im_axis/beta
+            self.re_axis = re_axis*beta
+            self.im_data = im_data
+            self.beta = beta
 
-    
-
-    def solve(self,method='',**kwargs):
-        if method=='maxent_svd':
-            self.solver=MaxentSolverSVD(self.im_axis,self.re_axis,self.im_data,kernel_mode=self.kernel_mode,model=kwargs['model'],stdev=kwargs['stdev'])
-            sol=self.solver.solve(alpha_determination=kwargs['alpha_determination'])
+    def solve(self, method='', **kwargs):
+        print ('method', method)
+        if (method == 'maxent_svd'):
+            self.solver = MaxentSolverSVD(self.im_axis, self.re_axis, self.im_data,
+                                              kernel_mode=self.kernel_mode, model=kwargs['model'],
+                                              stdev=kwargs['stdev'])
+            #sol = self.solver.solve(alpha_determination=kwargs['alpha_determination'])
+            print ('D')
+            return 1, 1
             # TODO implement a postprocessing method, where the following should be done more carefully
-            if self.kernel_mode=='time_fermionic':
-                sol[0].A_opt*=self.beta
-            elif self.kernel_mode=='freq_fermionic':
-                bt=sol[0].backtransform
-                n=bt.shape[0]/2
-                sol[0].backtransform=bt[:n]+1j*bt[n:]
-            elif self.kernel_mode=='time_bosonic':
-                sol[0].A_opt*=self.beta
-                sol[0].backtransform/=self.beta
-            return sol
-        if method=='maxent_mc':
+            if (self.kernel_mode == 'time_fermionic'):
+                sol[0].A_opt *= self.beta
+            elif (self.kernel_mode == 'freq_fermionic'):
+                bt = sol[0].backtransform
+                n = bt.shape[0] / 2
+                sol[0].backtransform = bt[:n] + 1j * bt[n:]
+            elif (self.kernel_mode == 'time_bosonic'):
+                sol[0].A_opt *= self.beta
+                sol[0].backtransform /= self.beta
+            return sol, 0
+        elif (method == 'maxent_mc'):
             raise NotImplementedError
-        if method=='pade':
-            self.solver=PadeSolver(im_axis=self.im_axis,re_axis=self.re_axis,im_data=self.im_data)
-            return self.solver.solve()
+        elif (method == 'pade'):
+            raise NotImplementedError
+            #self.solver=PadeSolver(im_axis=self.im_axis,re_axis=self.re_axis,im_data=self.im_data)
+            #return self.solver.solve()
+        else:
+            raise NotImplementedError
 
     def error_propagation(self,obs,args):
         return self.solver.error_propagation(obs,args)
-
 
 # class for return value of maxent_optimization
 class OptimizationResult:
@@ -118,76 +122,76 @@ class PadeSolver(AnalyticContinuationSolver):
 
 class MaxentSolverSVD(AnalyticContinuationSolver):
     def __init__(self,im_axis,re_axis,im_data,kernel_mode='',model=None,stdev=None,beta=None,**kwargs):
-        self.kernel_mode=kernel_mode
-        self.im_axis=im_axis
-        self.re_axis=re_axis
-        self.im_data=im_data
-        self.nw=self.re_axis.shape[0]
-        self.wmin=self.re_axis[0]
-        self.wmax=self.re_axis[-1]
-        self.dw=np.diff(np.concatenate(([self.wmin],(self.re_axis[1:]+self.re_axis[:-1])/2.,[self.wmax])))
-        self.model=model # the model should be normalized by the user himself
+        self.kernel_mode = kernel_mode
+        self.im_axis = im_axis
+        self.re_axis = re_axis
+        self.im_data = im_data
+        self.nw = self.re_axis.shape[0]
+        self.wmin = self.re_axis[0]
+        self.wmax = self.re_axis[-1]
+        self.dw = np.diff(np.concatenate(([self.wmin],(self.re_axis[1:]+self.re_axis[:-1])/2.,[self.wmax])))
+        self.model = model # the model should be normalized by the user himself
 
-        if self.kernel_mode=='freq_bosonic':
-            self.var=stdev**2
-            self.E=1./self.var
-            self.niw=self.im_axis.shape[0]
-            self.kernel=(self.re_axis**2)[None,:]/((self.re_axis**2)[None,:]+(self.im_axis**2)[:,None])
-            self.kernel[0,0]=1. # analytically with de l'Hospital
-        elif self.kernel_mode=='time_bosonic':
-            self.var=stdev**2
-            self.E=1./self.var
-            self.niw=self.im_axis.shape[0]
-            self.kernel=0.5*self.re_axis[None,:]*(
-                    np.exp(-self.re_axis[None,:]*self.im_axis[:,None])
-                    +np.exp(-self.re_axis[None,:]*(1.-self.im_axis[:,None])))/(
-                            1.-np.exp(-self.re_axis[None,:]))
-            self.kernel[:,0]=1. # analytically with de l'Hospital
-        elif self.kernel_mode=='freq_fermionic':
-            self.var=np.concatenate((stdev**2,stdev**2))
-            self.E=1./self.var
-            self.niw=2*self.im_axis.shape[0]
-            self.kernel=np.zeros((self.niw,self.nw)) # fermionic Matsubara GF is complex
-            self.kernel[:self.niw/2,:]=-self.re_axis[None,:]/((self.re_axis**2)[None,:] + (self.im_axis**2)[:,None])
-            self.kernel[self.niw/2:,:]=-self.im_axis[:,None]/((self.re_axis**2)[None,:] + (self.im_axis**2)[:,None])
-        elif self.kernel_mode=='time_fermionic':
-            self.var=stdev**2
-            self.E=1./self.var
-            self.niw=self.im_axis.shape[0]
-            self.kernel=np.exp(-self.im_axis[:,None]*self.re_axis[None,:])/(1.+np.exp(-self.re_axis[None,:]))
-        elif self.kernel_mode=='freq_fermionic_phsym': # in this case, the data must be purely real (the imaginary part!)
+        if (self.kernel_mode == 'freq_bosonic'):
+            self.var = stdev**2
+            self.E = 1./self.var
+            self.niw = self.im_axis.shape[0]
+            self.kernel = (self.re_axis**2)[None,:] / ((self.re_axis**2)[None,:] + (self.im_axis**2)[:,None])
+            self.kernel[0,0] = 1. # analytically with de l'Hospital
+        elif (self.kernel_mode == 'time_bosonic'):
+            self.var = stdev**2
+            self.E = 1. / self.var
+            self.niw = self.im_axis.shape[0]
+            self.kernel = 0.5 * self.re_axis[None,:] * (
+                np.exp(-self.re_axis[None,:]*self.im_axis[:,None])
+                + np.exp(-self.re_axis[None,:]*(1. - self.im_axis[:,None]))) / (
+                    1. - np.exp(-self.re_axis[None,:]))
+            self.kernel[:, 0] = 1. # analytically with de l'Hospital
+        elif (self.kernel_mode == 'freq_fermionic'):
+            self.var = np.concatenate((stdev**2, stdev**2))
+            self.E = 1. / self.var
+            self.niw = 2 * self.im_axis.shape[0]
+            self.kernel = np.zeros((self.niw, self.nw)) # fermionic Matsubara GF is complex
+            self.kernel[:self.niw/2, :] = -self.re_axis[None,:] / ((self.re_axis**2)[None,:] + (self.im_axis**2)[:,None])
+            self.kernel[self.niw/2:, :] = -self.im_axis[:,None] / ((self.re_axis**2)[None,:] + (self.im_axis**2)[:,None])
+        elif (self.kernel_mode == 'time_fermionic'):
+            self.var = stdev**2
+            self.E = 1. / self.var
+            self.niw = self.im_axis.shape[0]
+            self.kernel = (np.exp(-self.im_axis[:,None] * self.re_axis[None,:]) /
+                               (1.+np.exp(-self.re_axis[None,:])))
+        elif (self.kernel_mode == 'freq_fermionic_phsym'): # in this case, the data must be purely real (the imaginary part!)
             print ('Warning: phsym kernels do not give good results in this implementation. ')
-            self.var=stdev**2
-            self.E=1./self.var
-            self.niw=self.im_axis.shape[0]
-            self.kernel=-2.*self.im_axis[:,None]/((self.im_axis**2)[:,None]+(self.re_axis**2)[None,:])
-        elif self.kernel_mode=='time_fermionic_phsym':
+            self.var = stdev**2
+            self.E = 1. / self.var
+            self.niw = self.im_axis.shape[0]
+            self.kernel = -2. * self.im_axis[:,None] / ((self.im_axis**2)[:,None] + (self.re_axis**2)[None,:])
+        elif (self.kernel_mode == 'time_fermionic_phsym'):
             print ('Warning: phsym kernels do not give good results in this implementation. ')
-            self.var=stdev**2
-            self.E=1./self.var
-            self.niw=self.im_axis.shape[0]
-            self.kernel=(np.cosh(self.im_axis[:,None]*self.re_axis[None,:]) 
-                          +np.cosh((1.-self.im_axis[:,None])*self.re_axis[None,:])) / (1.+np.cosh(self.re_axis[None,:]))
+            self.var = stdev**2
+            self.E = 1. / self.var
+            self.niw = self.im_axis.shape[0]
+            self.kernel = (np.cosh(self.im_axis[:,None] * self.re_axis[None,:])
+                          + np.cosh((1. - self.im_axis[:,None]) *
+                                        self.re_axis[None,:])) / (1. + np.cosh(self.re_axis[None,:]))
         else:
             print ('Unknown kernel')
             sys.exit()
 
-        U,S,Vt=np.linalg.svd(self.kernel,full_matrices=False)
+        U, S, Vt = np.linalg.svd(self.kernel, full_matrices=False)
 
         self.n_sv = np.arange(min(self.nw,self.niw))[S>1e-10][-1] # number of singular values larger than 1e-10
 
-        self.U_svd=np.array(U[:,:self.n_sv],dtype=np.float64,order='C')
-        self.V_svd=np.array(Vt[:self.n_sv,:].T,dtype=np.float64,order='C') # numpy.svd returns V.T
-        self.Xi_svd=S[:self.n_sv]
+        self.U_svd = np.array(U[:, :self.n_sv], dtype=np.float64,order='C')
+        self.V_svd = np.array(Vt[:self.n_sv, :].T, dtype=np.float64,order='C') # numpy.svd returns V.T
+        self.Xi_svd = S[:self.n_sv]
 
-        print ('spectral points:',self.nw)
-        print ('data points on imaginary axis:',self.niw)
-        print ('significant singular values:',self.n_sv)
-        print ('U',self.U_svd.shape)
-        print ('V',self.V_svd.shape)
-        print ('Xi',self.Xi_svd.shape)
-
-
+        print ('spectral points:', self.nw)
+        print ('data points on imaginary axis:', self.niw)
+        print ('significant singular values:', self.n_sv)
+        print ('U', self.U_svd.shape)
+        print ('V', self.V_svd.shape)
+        print ('Xi', self.Xi_svd.shape)
 
         #=============================================================================================
         # First, precompute as much as possible
@@ -197,31 +201,32 @@ class MaxentSolverSVD(AnalyticContinuationSolver):
         print  ('Precomputation of coefficient matrices')
 
         # allocate space
-        self.W2=np.zeros((self.n_sv,self.nw),order='C',dtype=np.float64)
-        self.W3=np.zeros((self.n_sv,self.n_sv,self.nw))
-        self.d2chi2=np.zeros((self.nw,self.nw))
-        self.Evi=np.zeros((self.n_sv))
+        self.W2 = np.zeros((self.n_sv, self.nw), order='C', dtype=np.float64)
+        self.W3 = np.zeros((self.n_sv, self.n_sv, self.nw))
+        self.d2chi2 = np.zeros((self.nw, self.nw))
+        self.Evi = np.zeros((self.n_sv))
 
-        # precompute matrices W_ml (W2), W_mil (W3)
-        precomp.precompute_W2(self.W2,self.E,self.U_svd,self.Xi_svd,self.V_svd,self.dw,self.model)
-        self.W3=self.W2[:,None,:]*(self.V_svd[None,:,:]).transpose((0,2,1))
+        # precompute matrices W_ml (W2),  W_mil (W3)
+        spam.system(self.W2, self.E, self.U_svd, self.Xi_svd, self.V_svd, self.dw, self.model)
+        #precomp.precompute_W2(self.W2, self.E, self.U_svd, self.Xi_svd, self.V_svd, self.dw, self.model)
+        #self.W3 = self.W2[:, None, :]*(self.V_svd[None, :, :]).transpose((0, 2, 1))
 
         # precompute the evidence vector Evi_m
-        for m in xrange(self.n_sv):
-            for k in xrange(self.niw):
-                self.Evi[m]+=self.Xi_svd[m]*self.U_svd[k,m]*self.E[k]*self.im_data[k]
+        #for m in xrange(self.n_sv):
+        #    for k in xrange(self.niw):
+        #        self.Evi[m]+=self.Xi_svd[m]*self.U_svd[k, m]*self.E[k]*self.im_data[k]
 
         # precompute curvature of likelihood function
-        precomp.precompute_d2chi2(self.d2chi2,self.kernel,self.dw,self.E)
+        #precomp.precompute_d2chi2(self.d2chi2, self.kernel, self.dw, self.E)
 
         # some arrays that are used later...
-        self.chi2arr=[]
-        self.specarr=[]
-        self.backarr=[]
-        self.entrarr=[]
-        self.alpharr=[]
-        self.uarr=[]
-        self.bayesConv=[]
+        self.chi2arr = []
+        self.specarr = []
+        self.backarr = []
+        self.entrarr = []
+        self.alpharr = []
+        self.uarr = []
+        self.bayesConv = []
 
     #=============================================================================================
     # Here, we define the main functions needed for the root finding problem
@@ -232,12 +237,12 @@ class MaxentSolverSVD(AnalyticContinuationSolver):
     # define derivative f_m(u) = SVD(dQ/dA)_m [we search for zeros of f(u)]
     # and the Jacobian matrix of f, J_mi=df_m/du_i
     # TODO this is the main function call, it must be optimized as much as possible!
-    def compute_f_J(self,u,alpha):
-        v=np.dot(self.V_svd,u)
+    def compute_f_J(self, u, alpha):
+        v=np.dot(self.V_svd, u)
         w=np.exp(v)
-        f=alpha*u + np.dot(self.W2,w) - self.Evi
-        J=alpha*np.eye(self.n_sv) + np.dot(self.W3,w)
-        return f,J
+        f=alpha*u + np.dot(self.W2, w) - self.Evi
+        J=alpha*np.eye(self.n_sv) + np.dot(self.W3, w)
+        return f, J
 
 
     #=============================================================================================
@@ -245,28 +250,28 @@ class MaxentSolverSVD(AnalyticContinuationSolver):
     #=============================================================================================
 
     # transform the singular space vector u into real space (spectral function)
-    def singular2realspace(self,u):
-        return self.model*np.exp(np.dot(self.V_svd,u))
+    def singular2realspace(self, u):
+        return self.model*np.exp(np.dot(self.V_svd, u))
 
     # backtransformation from real to imaginary axis
-    def backtransform(self,A):
-        return np.dot(self.kernel,A*self.dw)
+    def backtransform(self, A):
+        return np.dot(self.kernel, A*self.dw)
 
     # compute the log-likelihood function of A
-    def chi2(self,A):
-        return np.sum(self.E*(self.im_data-np.dot(self.kernel,A*self.dw))**2)
+    def chi2(self, A):
+        return np.sum(self.E*(self.im_data-np.dot(self.kernel, A*self.dw))**2)
 
-    def entropy(self,A,u):
-        return np.trapz(A-self.model-A*np.dot(self.V_svd,u),self.re_axis)
+    def entropy(self, A, u):
+        return np.trapz(A-self.model-A*np.dot(self.V_svd, u), self.re_axis)
 
     # Bayesian convergence criterion for classic maxent (maximum of probablility distribution)
-    def bayes_conv(self,A,entr,alpha):
-        LambdaMatrix=np.sqrt(A/self.dw)[:,None]*self.d2chi2*np.sqrt(A/self.dw)[None,:]
+    def bayes_conv(self, A, entr, alpha):
+        LambdaMatrix=np.sqrt(A/self.dw)[:, None]*self.d2chi2*np.sqrt(A/self.dw)[None, :]
         lam=np.linalg.eigvalsh(LambdaMatrix)
         ng=-2.*alpha*entr
         tr=np.sum(lam/(alpha+lam))
         conv=tr/ng
-        return ng,tr,conv
+        return ng, tr, conv
 
     # Bayesian a-posteriori probability for alpha after optimization of A
     def posterior_probability(self,A,alpha,entr,chisq):
